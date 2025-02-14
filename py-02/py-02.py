@@ -36,13 +36,15 @@ def game_loop(pri, defi, pile, turn):
             print(f"It is now the players turn, pick a number between 1 and {int(pile * .5)}")
             while True:
                 try:
-                    marbles_taken = int(input(f"Input take (1 to {int(pile * 0.5)}): "))
-                    if 1 <= marbles_taken <= int(pile * 0.5):
+                    max_take = max(1, int(pile * 0.5))  # Ensure the minimum take is 1
+                    marbles_taken = int(input(f"Input take (1 to {max_take}): "))
+                    if 1 <= marbles_taken <= max_take:
                         break
                     else:
                         print("Invalid move! Choose a number within the allowed range.")
                 except ValueError:
-                        print("Invalid input! Enter a number.")
+                    print("Invalid input! Enter a valid number.")
+
             pile -= marbles_taken
 
             print(f"Player take {marbles_taken}")
@@ -61,12 +63,17 @@ def Easy_Mode():
 
 #Hard Mode definition for the game loop            
 def Hard_Mode():
-    def MAKE_IT_HARDER_FOR_THE_PLAYER(pile): 
-        n, num = 1, 1
-        while (2**n - 1) <= pile:
-            num = (2**n - 1)
-            n += 1
-        return num    
+    def MAKE_IT_HARDER_FOR_THE_PLAYER(pile):
+        power = 1
+        while (2**power - 1) <= pile:
+            power += 1
+        best_move = pile - (2**(power - 1) - 1)
+        
+        # If best_move is 0 or greater than half of pile, make a random move instead
+        if best_move == 0 or best_move > int(pile * 0.5):
+            return random.randint(1, int(pile * 0.5))
+        return best_move
+
     
     print("Hard Mode Selected")
     who_The_Turn_IS_IT, pile = Initilize_Game_of_Nim()
@@ -83,11 +90,11 @@ def main():
         2: Hard_Mode
     }
     
-    print("Starting...")  
-    print("")
+    print("🚀 Hello, welcome to the game of Nim 🚀")
     
     while True:
-        print("🚀 Hello, welcome to the game of Nim 🚀\nWould you like to play, please select an option below.\n0) Exit\n1) Easy Mode\n2) Hard Mode")
+        print("\nWould you like to play? Please select an option below.")
+        print("0) Exit\n1) Easy Mode\n2) Hard Mode")
         try:
             user_Input = int(input("Choose an option: "))
             option_Selection.get(user_Input, InvalidOption)()
