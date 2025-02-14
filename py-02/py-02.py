@@ -1,14 +1,21 @@
 
 import random
 
-def Easy_Mode():
-    who_goes_First = str
+def Initilize_Game_of_Nim():
+    w = str
     if random.choice(False, True):
         who_goes_First = "AI"
     else:
         who_goes_First = "Player"
-    print(f"Easy Mode selected {who_goes_First} will go first")
-    pile = random.randint(10, 100)
+    print(f"{who_goes_First} will go first")
+    p = random.randint(10, 100)
+    
+    return w, p
+
+def Easy_Mode():
+    
+    print("Easy Mode Selected")
+    who_goes_First, pile = Initilize_Game_of_Nim()
     
     while(True):
         print(f"There are {pile} marbles in the pile")
@@ -21,13 +28,18 @@ def Easy_Mode():
                 break
             who_goes_First = "Player"
         elif who_goes_First is "Player":
-            print(f"It is now the players turn, pick a number between 1 and {int(pile * .5)}\n")
-            marbles_taken = int(input())
+            print(f"It is now the players turn, pick a number between 1 and {int(pile * .5)}")
+            marbles_taken = int(input("Input take: "))
+            print(f"Player take {marbles_taken}")
+            if pile is 0:
+                print("Player has LOST!")
+                break
+        else:
+            print("ERROR")
+            exit()
             
-            
-
 def Hard_Mode():
-    print("PH")
+    print("Hard Mode Selected")
 
 def main():
     print("PH")
