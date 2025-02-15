@@ -1,28 +1,31 @@
+"""
+This Python program is a fun and chaotic take on the Game of Nim, where players take turns removing marbles from a pile. 
+The goal is to avoid taking the last marble. The game features Easy and Hard modes, 
+with the AI using random moves in Easy Mode and a strategic (but slightly unpredictable) approach in Hard Mode. 
+It uses Enum for turn management and includes error handling for invalid inputs. 
+The randomness adds an unexpected twist, making each game unique and entertaining! 🎮🔥
+"""
 
 import random
-#from enum import Enum
+from enum import Enum
 
-""" class TurnP(Enum):
+class Turn(Enum):
     PLAYER = "Player",
-    AI = "Ai" """
+    AI = "Ai" 
 
-def Gets_A_RANDOM_NUMBER_BETWEEN_THIS_AND_THAT_OVER_THE_WALL_OF_CODE_FALSE_CHAOS(a):
+def False_Chaos(a):
     if a is 1:
         return 1
     return random.randint(1, int(a * .5))
-# def Gets_A_RANDOM_NUMBER_BETWEEN_THIS_AND_THAT_OVER_THE_WALL_OF_CODE_FALSE_CHAOS(a, b):
+# def False_Chaos(a, b):
 #    return random.randint(a, b)
 
 #The initilizating of the game that both rules use just returns a random and another a choice
 def Initilize_Game_of_Nim():
-    w = ""
-    if random.choice([False, True]) is True:
-        w = "AI"
-    else:
-        w = "Player"
-    print(f"{w} will go first")
+    turn = Turn.AI if random.choice([False, True]) else Turn.PLAYER
+    print(f"{turn} will go first")
     p = random.randint(10, 100)
-    return w, p
+    return turn, p
 
 #The Game loop for the game, this is the loop for easy and hard
 #The way it does this while using 2 rule sets it by turning the
@@ -31,7 +34,7 @@ def game_loop(a, b, c ,d):
     pri, defi, pile, turn = a, b, c, d # This is done so it doesnt reference the old values
     print(pri)
     while(True):
-        if turn is "AI":
+        if turn == Turn.AI:
             print("It is now the AI's turn")
             marbles_taken = defi(pile + random.randint(0, 2)) # Introduced an extra level of chaos so that the ai can overtake
             pile -= marbles_taken
@@ -39,10 +42,10 @@ def game_loop(a, b, c ,d):
             if pile <= 0:
                 print("Player Has Won the game")
                 break
-            turn = "Player"
-        elif turn is "Player":
+            turn = Turn.PLAYER
+        elif turn is Turn.PLAYER:
             # Introduced a level of randomess so that the player can accidently overtake
-            print(f"It is now the players turn, pick a number between 1 and {int(pile * .5) + random.randint(1, 3)}")
+            print(f"It is now the players turn")
             while True:
                 try:
                     max_take = max(1, int(pile * 0.5))  # Ensure the minimum take is 1
@@ -54,14 +57,12 @@ def game_loop(a, b, c ,d):
                     break # Why do we need to check for this ^^^?
                 except ValueError:
                     print("Invalid input! Enter a valid number.")
-
             pile -= marbles_taken
-
             print(f"Player take {marbles_taken} Marbles")
             if pile <= 0:
                 print("Player has LOST! (╯‵□′)╯︵┻━┻")
                 break
-            turn = "AI"
+            turn = Turn.AI
         else:
             print("ERROR")
             exit()
@@ -70,7 +71,7 @@ def game_loop(a, b, c ,d):
 def Easy_Mode():
     print("Easy Mode Selected")
     who_goes_First, pile = Initilize_Game_of_Nim()
-    game_loop(f"There are {pile} marbles in the pile", Gets_A_RANDOM_NUMBER_BETWEEN_THIS_AND_THAT_OVER_THE_WALL_OF_CODE_FALSE_CHAOS, pile, who_goes_First)
+    game_loop(f"There are {pile} marbles in the pile", False_Chaos, pile, who_goes_First)
 
 #Hard Mode definition for the game loop            
 def Hard_Mode():
