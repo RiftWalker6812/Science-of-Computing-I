@@ -1,9 +1,9 @@
 import sys
 import os
-
 # Get the directory containing 'library'
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+#additional librarys
 import time
 from Librarys.RiftLib import is_prime
  
