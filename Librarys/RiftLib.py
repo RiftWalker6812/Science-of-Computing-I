@@ -34,3 +34,16 @@ def is_prime(n):
 
     limit = int(math.sqrt(n))
     return all(n % i != 0 and n % (i + 2) != 0 for i in range(5, limit + 1, 6))
+
+# Max index return
+def get_selection_input(max_index):
+    """Get user input for selecting an image by index."""
+    while True:
+        try:
+            n = int(input(f"Select an image (0–{max_index}): "))
+            if 0 <= n <= max_index:
+                return n
+            else:
+                print(f"Please enter a number between 0 and {max_index}.")
+        except ValueError:
+            print("Invalid input. Please enter an integer.")
