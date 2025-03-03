@@ -35,7 +35,7 @@ def refresh_image_list():
         image_files = [
             os.path.join(images_dir, f)
             for f in os.listdir(images_dir)
-            if f.lower().endswith((".png", ".jpg", ".jpeg", ".bmp", ".rifti"))
+                if f.lower().endswith((".png", ".jpg", ".jpeg", ".bmp", ".rifti"))
         ]
         return image_files
     except FileNotFoundError:
@@ -67,31 +67,6 @@ def save_ascii_output(ascii_text, filename):
     with open(output_path, "w") as file:
         file.write(ascii_text)
     return output_path
-
-""" def process_image_to_ascii(image_path, width=50):
-    # Convert an image to ASCII art. 
-    try:
-        # Read and resize image
-        img = Image.open(image_path).convert("RGB")
-        aspect_ratio = img.height / img.width
-        new_height = int(width * aspect_ratio)
-        img_resized = img.resize((width, new_height), Image.Resampling.BILINEAR)
-        
-        # Convert to grayscale and get pixel data
-        img_gray = img_resized.convert("L")
-        pixels = img_gray.getdata()
-        
-        # Map pixels to ASCII characters
-        char_range = len(ASCII_CHARS) - 1
-        ascii_art = ""
-        for i, pixel in enumerate(pixels):
-            char_index = int(pixel / 255 * char_range)
-            ascii_art += ASCII_CHARS[char_index]
-            if (i + 1) % width == 0:
-                ascii_art += "\n"
-        return ascii_art
-    except Exception as e:
-        return f"Error processing image: {e}" """
 
 def process_image_to_ascii(image_path, output_width=80):
     """Convert an image to ASCII art."""
