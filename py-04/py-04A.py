@@ -35,7 +35,7 @@ def refresh_image_list():
         image_files = [
             os.path.join(images_dir, f)
             for f in os.listdir(images_dir)
-                if f.lower().endswith((".png", ".jpg", ".jpeg", ".bmp", ".rifti"))
+            if f.lower().endswith((".png", ".jpg", ".jpeg", ".bmp", ".rifti")) # Not sure if this should be tabbed
         ]
         return image_files
     except FileNotFoundError:
