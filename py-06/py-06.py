@@ -30,6 +30,7 @@ class Record_Data(NamedTuple):
     extra: str
 
 Datas_List: dict[int, list[Record_Data]] = {}
+title, x_axis, source = str, str, str
 
  # Get the directory of the current script
 script_dir = Path(__file__).parent
@@ -75,6 +76,9 @@ def read_and_parse_text_file(filename: str):
 
         # Parse the file content
         lines = content.strip().split("\n")
+        
+        title, x_axis, source = lines[0], lines[1], lines[2]
+        
         i = 0
         while i < len(lines):
             # Skip header lines until we hit a number (e.g., "27" or "12")
@@ -142,16 +146,21 @@ def main():
         User_Select = int(input("Select a data file you want displayed (Int): "))
         read_and_parse_text_file(file_name_data[User_Select])
         
-        print("Data in Datas_List:")
+        """ print("Data in Datas_List:")
         for year, records in Datas_List.items():
             print(f"Year {year}:")
             for record in records:
                 print(f"  {record.name}, {record.location}, {record.value_dat}, {record.extra}")
-
-       
+ """    
+        # How many Bars
         
-       
-        
+        # Setup Bars
+        chart = BarChart(title, x_axis, source)
+        for Years_dat, Records_Dat in Datas_List.items():
+            chart.set_caption(Years_dat)
+            for rec in Records_Dat: # Remake to set bars up to 10
+                chart.add(f'{rec.name}, {rec.location}',    rec.value_dat, rec.extra)
+ 
     except FileNotFoundError as e:
         print(e)    
     
