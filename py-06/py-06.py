@@ -132,8 +132,10 @@ def read_and_parse_text_file(filename: str) -> None:
 
     return #content
 
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 
-def main():
+def main(): # My function
     try:
         
          # Get available files
@@ -174,9 +176,9 @@ def main():
                 chart.add(f"{rec.name}, {rec.location}", int(rec.value_dat), rec.extra)
             
             chart.draw()    
-            time.sleep(10)
+            time.sleep(.35)
         chart.leave_window_open()
-        
+
     except FileNotFoundError as e:
         print(e)
     except ValueError as e:
@@ -184,6 +186,66 @@ def main():
     except Exception as e:
         print(f"Unexpected error: {e}")      
     
+def better_main(): # THIS ONE IS BEYOND ME AS IT WORKS WITH ANIMATIONS
+    try:
+        # Get available files
+        file_names = get_text_filenames()
+        if not file_names:
+            print("No .txt files found in Data folder.")
+            return
+        
+        # Display file options
+        for i, name in enumerate(file_names):
+            print(f"{i}: {name}")
+        
+        # User selects file
+        user_select = int(input("Select a data file by number: "))
+        if user_select < 0 or user_select >= len(file_names):
+            raise ValueError("Invalid file selection.")
+        
+        # Parse the selected file
+        read_and_parse_text_file(file_names[user_select])
+        
+        # Get number of bars from user
+        number_of_bars = min(int(input("Input number of bars to display (max 10): ")), 10)
+        
+        # Prepare data
+        sorted_data = {
+            year: sorted(records, key=lambda r: int(r.value_dat), reverse=True)[:number_of_bars]
+            for year, records in Datas_List.items()
+        }
+        years = list(sorted_data.keys())
+
+        # Setup chart
+        chart = BarChart(title, x_axis, source)
+        
+        # Animation function
+        def update(frame):
+            chart.reset()
+            year = years[frame % len(years)]
+            chart.set_caption(str(year))
+            for rec in sorted_data[year]:
+                chart.add(f"{rec.name}, {rec.location}", int(rec.value_dat), rec.extra)
+            chart.draw()
+            return chart.fig.gca(),  # Return the updated axes
+
+        # Create animation
+        ani = FuncAnimation(
+            chart.fig,          # The figure to animate
+            update,             # Function to call for each frame
+            frames=len(years),  # Number of frames (one per year)
+            interval=250,      # Delay between frames in milliseconds (2 seconds)
+            repeat=True         # Loop the animation
+        )
+        
+        chart.leave_window_open()  # Keep the window open
+
+    except FileNotFoundError as e:
+        print(e)
+    except ValueError as e:
+        print(f"Error: {e}")
+    except Exception as e:
+        print(f"Unexpected error: {e}")
     
     
 if __name__ == '__main__':
