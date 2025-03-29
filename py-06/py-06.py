@@ -21,6 +21,8 @@ Dict: year, List[Record_Data]
 from BarChart import BarChart
 from typing import NamedTuple
 from pathlib import Path
+import matplotlib
+import time
 
 class Record_Data(NamedTuple):
     year: int
@@ -30,14 +32,14 @@ class Record_Data(NamedTuple):
     extra: str
 
 Datas_List: dict[int, list[Record_Data]] = {}
-title, x_axis, source = str, str, str
+title: str = ""
+x_axis: str = ""
+source: str = ""
 
  # Get the directory of the current script
 script_dir = Path(__file__).parent
 data_folder = script_dir / "Data"
 #Datas_folder = Path("Data")
-
-
 
 def get_text_filenames():
     """
@@ -53,14 +55,12 @@ def get_text_filenames():
     return filenames
 
 # AAAAA
-def read_and_parse_text_file(filename: str):
+def read_and_parse_text_file(filename: str) -> None:
     """
     Reads and parses a single specified .txt file from the folder, 
     storing the parsed data into Datas_List by year.
     Returns the raw content of the file as a string.
     """
-    
-    
     # Construct the full path to the Data folder and file
     
     file_path = data_folder / filename
@@ -72,11 +72,12 @@ def read_and_parse_text_file(filename: str):
     # Read the file # GROK HELPED ME HERE, I HATE NON JSON's
     with open(file_path, "r", encoding="utf-8") as file:
         content = file.read()
-        print(f"Contents of {file_path.name}:\n{content}\n")
+        #print(f"Contents of {file_path.name}:\n{content}\n")
 
         # Parse the file content
         lines = content.strip().split("\n")
         
+        global title, x_axis, source
         title, x_axis, source = lines[0], lines[1], lines[2]
         
         i = 0
@@ -135,34 +136,53 @@ def read_and_parse_text_file(filename: str):
 def main():
     try:
         
-        file_name_data = get_text_filenames()
-        if file_name_data is False:
-            print("Not Data Exists in Data Folder")
-            raise ValueError("No Data")
+         # Get available files
+        file_names = get_text_filenames()
+        if not file_names:
+            print("No .txt files found in Data folder.")
+            return
         
-        for i in range(len(file_name_data) - 1):
-            print(f"{i}: {file_name_data[i]}")
+        # Display file options
+        for i, name in enumerate(file_names):
+            print(f"{i}: {name}")
         
-        User_Select = int(input("Select a data file you want displayed (Int): "))
-        read_and_parse_text_file(file_name_data[User_Select])
+        # User selects file
+        user_select = int(input("Select a data file by number: "))
+        if user_select < 0 or user_select >= len(file_names):
+            raise ValueError("Invalid file selection.")
         
-        """ print("Data in Datas_List:")
-        for year, records in Datas_List.items():
-            print(f"Year {year}:")
-            for record in records:
-                print(f"  {record.name}, {record.location}, {record.value_dat}, {record.extra}")
- """    
-        # How many Bars
+         # Parse the selected file
+        read_and_parse_text_file(file_names[user_select])
         
+        # Get number of bars from user
+        number_of_bars = int(input("Input number of bars to display (max 10): "))
+        if number_of_bars > 10:
+            number_of_bars = 10  # Cap at 10
+            
         # Setup Bars
         chart = BarChart(title, x_axis, source)
-        for Years_dat, Records_Dat in Datas_List.items():
-            chart.set_caption(Years_dat)
-            for rec in Records_Dat: # Remake to set bars up to 10
-                chart.add(f'{rec.name}, {rec.location}',    rec.value_dat, rec.extra)
- 
+        
+        # Process each year’s data
+        for year, records in Datas_List.items():
+            # Sort by value_dat numerically (convert to int)
+            sorted_records = sorted(records, key=lambda r: int(r.value_dat), reverse=True)
+            chart.reset()  # Clear previous bars
+            chart.set_caption(str(year))
+            
+            # Add top N records (up to number_of_bars)
+            for rec in sorted_records[:number_of_bars]:
+                chart.add(f"{rec.name}, {rec.location}", int(rec.value_dat), rec.extra)
+            
+            chart.draw()    
+            time.sleep(10)
+        chart.leave_window_open()
+        
     except FileNotFoundError as e:
-        print(e)    
+        print(e)
+    except ValueError as e:
+        print(f"Error: {e}")
+    except Exception as e:
+        print(f"Unexpected error: {e}")      
     
     
     
