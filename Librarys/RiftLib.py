@@ -35,8 +35,8 @@ def is_prime(n):
     limit = int(math.sqrt(n))
     return all(n % i != 0 and n % (i + 2) != 0 for i in range(5, limit + 1, 6))
 
-# Max index return
-def get_selection_input(max_index):
+# Lists out max selection [NOTICE OF REMOVAL OR UPGRADE REQUIRED]
+def List_selection_input(max_index):
     """Get user input for selecting an image by index."""
     while True:
         try:
@@ -47,3 +47,21 @@ def get_selection_input(max_index):
                 print(f"Please enter a number between 0 and {max_index}.")
         except ValueError:
             print("Invalid input. Please enter an integer.")
+            
+def Reverse_Int(n: int, result: int = 0) -> int:
+    # Check if input is negative; raise an error if so
+    if n < 0:
+        raise ValueError("Input must be a non-negative integer")
+    
+    # Base case: when n becomes 0, return the accumulated result
+    if n == 0:
+        return result
+    
+    # Recursive case: extract last digit, shift result, and reduce n
+    return Reverse_Int(n // 10, result * 10 + n % 10)
+
+# recursive a new array each time a value gets removed for being lower that the initial, POP
+def Get_Arr_Max_Value(arr: list, Max = 0):
+    #CHeck
+    max = arr[len(arr)-1]
+    return Get_Arr_Max_Value()
