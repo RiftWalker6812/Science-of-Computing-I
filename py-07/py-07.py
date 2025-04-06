@@ -77,6 +77,6 @@ def generate_password():
     if 'π' in final_password:
         print("The password contains the letter π, which is a special character.")
         
-                
+        
 if __name__ == "__main__":
     generate_password()
