@@ -79,9 +79,10 @@ class Ship:
             self.angle += self.rotation_speed
         self.angle %= 360
 
-def Camera:
+class Camera:
     def __int__(self):
-        sefl.x = 0.0
+        self.x = 0.0
+        self.y = 0.0
          
 
 
