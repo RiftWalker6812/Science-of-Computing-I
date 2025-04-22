@@ -31,11 +31,12 @@ class Item:
         return f"{self.name} (x{self.count}): {self.description}"
     
 class Dungeon:
-    def __init__(self, name: str, description: str):
+    def __init__(self, name: str, description: str, room_count: int = 10):
         self.name = name
         self.description = description
         self.rooms: List[Room] = []  # Rooms in this dungeon
-        self.current_room: Optional[Room] = None  # Current room the player is in
+        self.current_room: Optional[Room] = 0  # Current room the player is in
+        self.room_count: int  # Total number of rooms in the dungeon
 
     def add_room(self, room: 'Room'):
         """Add a room to the dungeon."""
@@ -44,6 +45,25 @@ class Dungeon:
     def set_current_room(self, room: 'Room'):
         """Set the current room."""
         self.current_room = room
+    
+    def Generate(self):
+        """Generate rooms and items."""
+        for i in range(self.room_count):
+            
+            if i == 0:
+                # First room is the starting point
+                # The First room is empty and has no enemies
+                # It is special and also has a unique shape that represents the ship
+                room = Room(enemy_count=0, danger_level=0)
+                
+            elif i == self.room_count - 1:
+                # Last room is the exit
+                room = Room(enemy_count=1, danger_level=5)
+            else:
+                room = Room(enemy_count=random.randint(0, 5), danger_level=random.randint(1, 5))
+            #item = Item(name="Random Item", description="A random item.", count=random.randint(1, 10))
+            #room.add_item(item)
+            self.add_room(room)
 
 class Room:
     def __init__(self, enemy_count: int = 0, danger_level: int = 1):
@@ -51,16 +71,20 @@ class Room:
         self.enemy_count = enemy_count  # Number of enemies
         self.danger_level = danger_level  # Affects difficulty or events
         self.adjacent_rooms: List['Room'] = []  # Connected rooms
-
+        self.doorways_count: int = 1  # Number of doorways in the room
+        self.doorways: dict = {"N": -1, "E": -1, "S": -1, "W": -1}  # Dictionary to hold doorways and their room indexes, if -1 then there is no room in that direction
+        self.DungPosition: Tuple[float, float] = (0, 0) # not position but instead araingement of the room in the dungeon 
     def add_item(self, item: Item):
         """Add an item to the room."""
         self.items.append(item) # needs to be added in at a random position in the room
+        
+    
 
-    def add_adjacent_room(self, room: 'Room'):
-        """Connect this room to another (bidirectional)."""
-        if room not in self.adjacent_rooms:
-            self.adjacent_rooms.append(room)
-            room.adjacent_rooms.append(self)
+    # def add_adjacent_room(self, room: 'Room'):
+    #     """Connect this room to another (bidirectional)."""
+    #     if room not in self.adjacent_rooms:
+    #         self.adjacent_rooms.append(room)
+    #         room.adjacent_rooms.append(self)
             
 class Drone:
     def __init__(self):
