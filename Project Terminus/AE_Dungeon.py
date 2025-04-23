@@ -27,6 +27,71 @@ screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Dungeon Game")
 font = pygame.font.SysFont("arial", 24)
 
+
+
+
+
+class Item:
+    def __init__(self, name, unrevealed_name, description, unrevealed_description, revealed=False):
+        self.name = name
+        self.unrevealed_name = unrevealed_name
+        self.description = description
+        self.unrevealed_description = unrevealed_description
+        self.revealed = revealed
+
+ITEMS = {
+    "quantum_crystal": Item(
+        name="Quantum Crystal",
+        unrevealed_name="Glowing Shard",
+        description="A pulsating crystal containing 1 unit of Quantium, essential for stabilization.",
+        unrevealed_description="A mysterious shard emitting faint light.",
+        revealed=False
+    ),
+    "nano_repair_kit": Item(
+        name="Nano Repair Kit",
+        unrevealed_name="Strange Device",
+        description="Restores 20 HP to the droid.",
+        unrevealed_description="A compact device with unknown function.",
+        revealed=False
+    ),
+    "quantum_disruptor": Item(
+        name="Quantum Disruptor",
+        unrevealed_name="Odd Gadget",
+        description="Deals 10 extra damage to Einstein-Entities in one combat.",
+        unrevealed_description="A peculiar gadget with erratic energy.",
+        revealed=False
+    )
+}
+
+class Popup:
+    def __init__(self):
+        self.active = False
+        self.text = []
+        self.rect = pygame.Rect(SCREEN_WIDTH // 4, SCREEN_HEIGHT // 4, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+        self.close_button = pygame.Rect(self.rect.right - 60, self.rect.bottom - 40, 50, 30)
+
+    def show(self, text):
+        self.active = True
+        self.text = text if isinstance(text, list) else [text]
+
+    def draw(self, screen):
+        if not self.active:
+            return
+        pygame.draw.rect(screen, BLACK, self.rect)
+        pygame.draw.rect(screen, WHITE, self.rect, 2)
+        for i, line in enumerate(self.text):
+            text = font.render(line, True, WHITE)
+            screen.blit(text, (self.rect.x + 20, self.rect.y + 20 + i * 30))
+        pygame.draw.rect(screen, WHITE, self.close_button)
+        text = font.render("Close", True, BLACK)
+        screen.blit(text, (self.close_button.x + 5, self.close_button.y + 5))
+
+    def handle_click(self, pos):
+        if self.active and self.close_button.collidepoint(pos):
+            self.active = False
+            return True
+        return False
+
 class Room:
     def __init__(self, grid_x, grid_y):
         self.grid_x = grid_x
@@ -34,6 +99,7 @@ class Room:
         self.rect = pygame.Rect(grid_x * ROOM_SIZE, grid_y * ROOM_SIZE, ROOM_SIZE, ROOM_SIZE)
         self.doors = {"north": False, "south": False, "east": False, "west": False}
         self.id = None
+        self.items = random.sample(list(ITEMS.values()), k=random.randint(0, 3))
 
     def get_door_rects(self):
         """Return rectangles for door placeholders."""
@@ -195,11 +261,17 @@ class UI:
             pygame.draw.rect(screen, BLACK, rect, 2)
             text = font.render(direction.capitalize(), True, BLACK)
             screen.blit(text, (rect.x + 10, rect.y + 15))
+            
+        for i, [item, quantity] in enumerate(player.inventory):
+            name = item.name if item.revealed else item.unrevealed_name
+            text = font.render(f"{name}: {quantity}", True, WHITE)
+            screen.blit(text, (SCREEN_WIDTH - UI_WIDTH + 20, 630 + i * 30))
 
         text = font.render("Inventory", True, WHITE)
         screen.blit(text, (SCREEN_WIDTH - UI_WIDTH + 20, 600))
 
     def handle_click(self, pos, player):
+        
         for direction, rect in self.buttons.items():
             if rect.collidepoint(pos):
                 if direction == "scan":
