@@ -211,7 +211,7 @@ class UI:
         pygame.draw.rect(screen, BLACK, self.rect)
         pygame.draw.rect(screen, WHITE, self.rect, 2)
 
-        text = font.render(f"Stabilizer-9: HP {player.hp}/50", True, WHITE)
+        text = font.render(f"Droid-E002: HP {player.hp}/50", True, WHITE)
         screen.blit(text, (SCREEN_WIDTH - UI_WIDTH + 20, 20))
         text = font.render(f"Quantium: {player.quantium}/20", True, WHITE)
         screen.blit(text, (SCREEN_WIDTH - UI_WIDTH + 20, 60))
