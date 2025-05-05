@@ -1,5 +1,6 @@
 import pygame
 import random
+import os
 
 # Initialize Pygame
 pygame.init()
@@ -11,9 +12,9 @@ GRID_SIZE = 5  # 5x5 grid
 ROOM_SIZE = 150
 DUNGEON_WIDTH = GRID_SIZE * ROOM_SIZE  # 750 pixels
 UI_WIDTH = 286
-ROOM_COUNT = 10  # Increased to 10 rooms
+ROOM_COUNT = 10  # 10 rooms
 DOOR_SIZE = 12
-STARSHIP_SIZE = 30
+STARSHIP_SPRITE_SIZE = 128  # For prufer.png
 
 # Colors
 STARRY_BLUE = (10, 20, 50)
@@ -29,6 +30,29 @@ GRAY = (150, 150, 150)
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Quantum Pagoda")
 font = pygame.font.SysFont("arial", 24)
+
+# Load starship sprite with absolute path and detailed error handling
+script_dir = os.path.dirname(os.path.abspath(__file__))  # Directory of the script
+sprite_path = os.path.join(script_dir, "ASSETS", "prufer.png")
+try:
+    starship_sprite = pygame.image.load(sprite_path).convert_alpha()
+    starship_sprite = pygame.transform.scale(starship_sprite, (STARSHIP_SPRITE_SIZE, STARSHIP_SPRITE_SIZE))
+except FileNotFoundError:
+    print(f"Error: Could not find '{sprite_path}'. Ensure 'prufer.png' is in the 'ASSETS' folder.")
+    print(f"Current working directory: {os.getcwd()}")
+    # Create a checkerboard placeholder
+    starship_sprite = pygame.Surface((STARSHIP_SPRITE_SIZE, STARSHIP_SPRITE_SIZE), pygame.SRCALPHA)
+    for x in range(STARSHIP_SPRITE_SIZE):
+        for y in range(STARSHIP_SPRITE_SIZE):
+            color = CYAN if (x + y) % 2 == 0 else WHITE
+            starship_sprite.set_at((x, y), color)
+except pygame.error as e:
+    print(f"Error: Failed to load '{sprite_path}'. File may be corrupted or not a valid PNG. Error: {e}")
+    starship_sprite = pygame.Surface((STARSHIP_SPRITE_SIZE, STARSHIP_SPRITE_SIZE), pygame.SRCALPHA)
+    for x in range(STARSHIP_SPRITE_SIZE):
+        for y in range(STARSHIP_SPRITE_SIZE):
+            color = CYAN if (x + y) % 2 == 0 else WHITE
+            starship_sprite.set_at((x, y), color)
 
 # Room Descriptions Dictionary
 ROOM_DESCRIPTIONS = {
@@ -48,7 +72,7 @@ class Item:
         self.unrevealed_description = unrevealed_description
         self.revealed = revealed
 
-# Global Items Dictionary with Item instances
+# Global Items Dictionary
 ITEMS = {
     "quantum_crystal": Item(
         name="Quantum Crystal",
@@ -80,7 +104,6 @@ class Room:
         self.rect = pygame.Rect(grid_x * ROOM_SIZE, grid_y * ROOM_SIZE, ROOM_SIZE, ROOM_SIZE)
         self.doors = {"north": False, "south": False, "east": False, "west": False}
         self.items = random.sample(list(ITEMS.values()), k=random.randint(0, 3))
-        self.starship = grid_x == 0 and grid_y == 2
         # Assign room description
         if grid_x == 0 and grid_y == 2:
             self.description = ROOM_DESCRIPTIONS["starlit_chamber"]
@@ -91,26 +114,28 @@ class Room:
 
     def get_door_rects(self):
         door_rects = []
-        if self.doors["north"]:
-            door_rects.append(pygame.Rect(
-                self.rect.centerx - DOOR_SIZE // 2, self.rect.top - DOOR_SIZE // 2,
-                DOOR_SIZE, DOOR_SIZE
-            ))
-        if self.doors["south"]:
-            door_rects.append(pygame.Rect(
-                self.rect.centerx - DOOR_SIZE // 2, self.rect.bottom - DOOR_SIZE // 2,
-                DOOR_SIZE, DOOR_SIZE
-            ))
-        if self.doors["east"]:
-            door_rects.append(pygame.Rect(
-                self.rect.right - DOOR_SIZE // 2, self.rect.centery - DOOR_SIZE // 2,
-                DOOR_SIZE, DOOR_SIZE
-            ))
-        if self.doors["west"]:
-            door_rects.append(pygame.Rect(
-                self.rect.left - DOOR_SIZE // 2, self.rect.centery - DOOR_SIZE // 2,
-                DOOR_SIZE, DOOR_SIZE
-            ))
+        for direction in ["north", "south", "east", "west"]:
+            if self.doors[direction]:
+                if direction == "north":
+                    door_rects.append(pygame.Rect(
+                        self.rect.centerx - DOOR_SIZE // 2, self.rect.top - DOOR_SIZE // 2,
+                        DOOR_SIZE, DOOR_SIZE
+                    ))
+                elif direction == "south":
+                    door_rects.append(pygame.Rect(
+                        self.rect.centerx - DOOR_SIZE // 2, self.rect.bottom - DOOR_SIZE // 2,
+                        DOOR_SIZE, DOOR_SIZE
+                    ))
+                elif direction == "east":
+                    door_rects.append(pygame.Rect(
+                        self.rect.right - DOOR_SIZE // 2, self.rect.centery - DOOR_SIZE // 2,
+                        DOOR_SIZE, DOOR_SIZE
+                    ))
+                elif direction == "west":
+                    door_rects.append(pygame.Rect(
+                        self.rect.left - DOOR_SIZE // 2, self.rect.centery - DOOR_SIZE // 2,
+                        DOOR_SIZE, DOOR_SIZE
+                    ))
         return door_rects
 
 class Dungeon:
@@ -190,11 +215,21 @@ class Player:
         if new_room:
             self.current_room = new_room
             print(f"Moved to Room at ({new_room.grid_x}, {new_room.grid_y})")
-            # Show room description popup
-            popup.show(["Room Entry", new_room.description[0], new_room.description[1]])
             return True
         print(f"No room to the {direction}")
         return False
+
+    def exit_dungeon(self):
+        """Initiate the process of exiting the quantum pagoda.
+        
+        The exit process involves:
+        1. A confirmation popup to return to the Prufer starship.
+        2. Checking inventory for sufficient Quantum Crystals (e.g., 5).
+        3. A starship animation (power-up flash, upward ascent with particle trail, screen fade).
+        4. A final popup with mission results and a quit option.
+        See detailed description in the code comments.
+        """
+        pass
 
 class UI:
     def __init__(self):
@@ -204,7 +239,8 @@ class UI:
             "south": pygame.Rect(SCREEN_WIDTH - UI_WIDTH + 150, 200, 120, 50),
             "east": pygame.Rect(SCREEN_WIDTH - UI_WIDTH + 20, 260, 120, 50),
             "west": pygame.Rect(SCREEN_WIDTH - UI_WIDTH + 150, 260, 120, 50),
-            "scan": pygame.Rect(SCREEN_WIDTH - UI_WIDTH + 20, 320, 250, 50)
+            "scan": pygame.Rect(SCREEN_WIDTH - UI_WIDTH + 20, 320, 250, 50),
+            "exit": pygame.Rect(SCREEN_WIDTH - UI_WIDTH + 20, 380, 250, 50)  # New Exit button
         }
 
     def draw(self, screen, player):
@@ -217,8 +253,11 @@ class UI:
         screen.blit(text, (SCREEN_WIDTH - UI_WIDTH + 20, 60))
 
         for direction, rect in self.buttons.items():
-            enabled = direction != "scan" and player.current_room.doors.get(direction, False)
-            color = WHITE if enabled or direction == "scan" else GRAY
+            # Enable Exit only in starting room
+            enabled = (direction != "scan" and direction != "exit" and player.current_room.doors.get(direction, False)) or \
+                      direction == "scan" or \
+                      (direction == "exit" and player.current_room.grid_x == 0 and player.current_room.grid_y == 2)
+            color = WHITE if enabled else GRAY
             pygame.draw.rect(screen, color, rect)
             pygame.draw.rect(screen, BLACK, rect, 2)
             text = font.render(direction.capitalize(), True, BLACK)
@@ -253,6 +292,8 @@ class UI:
                     else:
                         text.append("No items found.")
                     popup.show(text)
+                elif direction == "exit" and player.current_room.grid_x == 0 and player.current_room.grid_y == 2:
+                    player.exit_dungeon()
                 elif player.move(direction, popup):
                     return True
         return False
@@ -280,10 +321,10 @@ class Popup:
         text = font.render("Close", True, BLACK)
         screen.blit(text, (self.close_button.x + 5, self.close_button.y + 5))
 
-    def handle_click(self, pos):
+    def handle_click(self, pos, player):
         if self.active and self.close_button.collidepoint(pos):
             self.active = False
-            return True
+            return False
         return False
 
 # Main game
@@ -299,8 +340,8 @@ while running:
         if event.type == pygame.QUIT:
             running = False
         elif event.type == pygame.MOUSEBUTTONDOWN:
-            if not popup.handle_click(event.pos):
-                ui.handle_click(event.pos, player, popup)
+            popup.handle_click(event.pos, player)
+            ui.handle_click(event.pos, player, popup)
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_RETURN and popup.active:
                 popup.active = False
@@ -315,9 +356,10 @@ while running:
         for door_rect in room.get_door_rects():
             offset_door = door_rect.move(offset)
             pygame.draw.rect(screen, WHITE, offset_door)
-        if room.starship:
-            starship_rect = pygame.Rect(offset_rect.x + 10, offset_rect.y + 60, STARSHIP_SIZE, STARSHIP_SIZE)
-            pygame.draw.rect(screen, GREEN, starship_rect)
+
+    # Draw starship sprite outside grid, left of starting room
+    starship_pos = (250 - STARSHIP_SPRITE_SIZE, 357 + ROOM_SIZE//2 - STARSHIP_SPRITE_SIZE//2)
+    screen.blit(starship_sprite, starship_pos)
 
     ui.draw(screen, player)
     popup.draw(screen)
