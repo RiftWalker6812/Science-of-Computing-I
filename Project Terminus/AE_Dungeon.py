@@ -250,16 +250,20 @@ class Player:
             print(f"Moved to Room at ({new_room.grid_x}, {new_room.grid_y})")
             if (new_room.grid_x, new_room.grid_y) not in self.dungeon.visited:
                 self.dungeon.visited.add((new_room.grid_x, new_room.grid_y))
-                popup.show(["Room Entry", new_room.description[0], new_room.description[1]])
             if new_room.entity:
                 popup.start_combat(self, new_room)
             return True
         print(f"No room to the {direction}")
         return False
 
-    def exit_dungeon(self):
+    def exit_dungeon(self, popup):
         """Initiate the process of exiting the quantum pagoda."""
-        pass
+        if self.quanta >= 10:
+            popup.show(["Mission Success", "Quantum Pagoda stabilized. Returning to base."])
+            return True
+        else:
+            popup.show(["Mission Incomplete", "Insufficient Quanta to stabilize the Pagoda."])
+            return False
 
     def combat(self, entity, popup):
         action = popup.combat_action
@@ -270,6 +274,9 @@ class Player:
         if self.overheated:
             popup.combat_log_lines.append("Nano Repair Kit cools down!")
             self.overheated = False
+
+        # Collect indices to remove to avoid modifying inventory during iteration
+        to_remove = []
 
         # Player action
         if action == "quantum_strike":
@@ -282,13 +289,13 @@ class Player:
                 popup.combat_log_lines.append(f"You deal {damage} damage to {entity.name}!")
             entity.hp -= damage
         elif action == "nano_repair_kit":
-            for i, [item, qty] in enumerate(self.inventory):
+            for i, [item, qty] in enumerate(self.inventory[:]):  # Copy list
                 if item.name == "Nano Repair Kit" and qty > 0:
                     heal = random.randint(15, 25)
                     self.hp = min(50, self.hp + heal)
                     qty -= 1
                     if qty == 0:
-                        self.inventory.pop(i)
+                        to_remove.append(i)
                     else:
                         self.inventory[i][1] = qty
                     popup.combat_log_lines.append(f"Used Nano Repair Kit. Restored {heal} HP!")
@@ -297,13 +304,13 @@ class Player:
                         popup.combat_log_lines.append("Nano Repair Kit overheated!")
                     break
         elif action == "quantum_disruptor":
-            for i, [item, qty] in enumerate(self.inventory):
+            for i, [item, qty] in enumerate(self.inventory[:]):  # Copy list
                 if item.name == "Quantum Disruptor" and qty > 0:
                     entity.hp -= 10
                     entity.weakened = True
                     qty -= 1
                     if qty == 0:
-                        self.inventory.pop(i)
+                        to_remove.append(i)
                     else:
                         self.inventory[i][1] = qty
                     popup.combat_log_lines.append(f"Used Quantum Disruptor. Dealt 10 damage and weakened {entity.name}!")
@@ -316,6 +323,11 @@ class Player:
                     popup.combat_log_lines.append("Phase Shift successful! Dodging next attack!")
                 else:
                     popup.combat_log_lines.append("Phase Shift failed!")
+
+        # Remove items after iteration
+        for i in sorted(to_remove, reverse=True):
+            self.inventory.pop(i)
+        to_remove.clear()
 
         # Entity action (if alive and not dodged)
         if entity.hp > 0 and not self.dodge_active:
@@ -331,16 +343,20 @@ class Player:
                     popup.combat_log_lines.append("PlaceHolder warps you to another room!")
                     popup.combat_mode = False
                 elif entity.ability == "quantum_leech":
-                    for i, [item, qty] in enumerate(self.inventory):
+                    for i, [item, qty] in enumerate(self.inventory[:]):  # Copy list
                         if item.name == "Quantum Crystal" and qty > 0:
                             qty -= 1
                             self.quanta -= 1
                             if qty == 0:
-                                self.inventory.pop(i)
+                                to_remove.append(i)
                             else:
                                 self.inventory[i][1] = qty
                             popup.combat_log_lines.append("Quantum Wraith steals 1 Quantum Crystal!")
                             break
+
+        # Remove items after iteration
+        for i in sorted(to_remove, reverse=True):
+            self.inventory.pop(i)
 
         # Resolve combat
         if self.hp <= 0:
@@ -418,7 +434,7 @@ class LeftUI:
                 room.items.remove(item)
                 item.revealed = True
                 found = False
-                for i, [inv_item, qty] in enumerate(player.inventory):
+                for i, [inv_item, qty] in enumerate(player.inventory[:]):  # Copy list
                     if inv_item.name == item.name:
                         qty += 1
                         player.inventory[i][1] = qty
@@ -509,13 +525,16 @@ class RightUI:
                     player.current_room.scanned = True
                     popup.show(["Quantum Scan Results:", "Room scanned. Objects visible."])
                     print("Room scanned. Objects visible in left UI.")
+                    return True
                 elif direction == "exit" and player.current_room.grid_x == 0 and player.current_room.grid_y == 2:
-                    player.exit_dungeon()
+                    if player.exit_dungeon(popup):
+                        return True  # Allow main loop to handle game end
+                    return True
                 elif player.move(direction, popup):
                     return True
         for button, item, qty in self.drop_buttons:
             if button.collidepoint(pos):
-                for i, [inv_item, inv_qty] in enumerate(player.inventory):
+                for i, [inv_item, inv_qty] in enumerate(player.inventory[:]):  # Copy list
                     if inv_item.name == item.name:
                         inv_qty -= qty
                         if inv_item.name == "Quantum Crystal":
@@ -528,11 +547,11 @@ class RightUI:
                         print(f"Dropped {qty} {item.name}")
                         print(f"Updated inventory: {[(i.name, q) for i, q in player.inventory]}")
                         print(f"Room items: {[i.name for i in player.current_room.items]}")
-                        break
+                        return True
                 return True
         for button, item, qty in self.drop_all_buttons:
             if button.collidepoint(pos):
-                for i, [inv_item, inv_qty] in enumerate(player.inventory):
+                for i, [inv_item, inv_qty] in enumerate(player.inventory[:]):  # Copy list
                     if inv_item.name == item.name:
                         if inv_item.name == "Quantum Crystal":
                             player.quanta -= qty
@@ -542,7 +561,7 @@ class RightUI:
                         print(f"Dropped {qty} {item.name} as individual items")
                         print(f"Updated inventory: {[(i.name, q) for i, q in player.inventory]}")
                         print(f"Room items: {[i.name for i in player.current_room.items]}")
-                        break
+                        return True
                 return True
         for button, item in self.interact_buttons:
             if button.collidepoint(pos):
@@ -564,11 +583,11 @@ class Popup:
         self.player = None
         self.entity = None
         self.room = None
-        # Action buttons
-        self.quantum_strike_button = pygame.Rect(self.rect.x + 432, self.rect.y + 442, 80, 40)
-        self.nano_repair_button = pygame.Rect(self.rect.x + 332, self.rect.y + 442, 80, 40)
-        self.quantum_disruptor_button = pygame.Rect(self.rect.x + 232, self.rect.y + 442, 80, 40)
-        self.phase_shift_button = pygame.Rect(self.rect.x + 132, self.rect.y + 442, 80, 40)
+        # Action buttons (will be set in draw)
+        self.quantum_strike_button = None
+        self.nano_repair_button = None
+        self.quantum_disruptor_button = None
+        self.phase_shift_button = None
         # Entity sprite (placeholder)
         self.entity_sprite = pygame.Surface((128, 128), pygame.SRCALPHA)
         for x in range(128):
@@ -611,141 +630,136 @@ class Popup:
         self.hp_animation["player"]["target"] = player.hp
         self.hp_animation["player"]["time"] = 0
 
-    def draw(self, screen):
+    def draw(self, screen, delta_time):
         if not self.active:
             return
 
         # Dimmed overlay
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 128))  # 50% opacity black
+        overlay.fill((0, 0, 0, 128))
         screen.blit(overlay, (0, 0))
-        
-        # Future quantum effects (not implemented)
-        """
-        FUTURE QUANTUM EFFECTS:
-        - Add particle system for cyan quantum particles drifting across overlay.
-        - Particles: 5x5 pixels, spawn randomly, fade out over 2 seconds.
-        - Room-specific: Mirrored particles (Mirror Hall), starry glints (Starlit Chamber).
-        - Implementation: Maintain list of [x, y, alpha, lifetime], update in game loop, render below popup.
-        - Purpose: Enhance quantum pagoda’s unstable, otherworldly vibe.
-        - Status: Deferred until core UI is stable.
-        """
 
         # Popup background
-        pygame.draw.rect(screen, (10, 20, 50, 200), self.rect)  # Semi-transparent STARRY_BLUE
+        pygame.draw.rect(screen, (10, 20, 50, 200), self.rect)
         self.border_timer += 0.1
         border_color = (0, 255, 255, int(255 * (0.8 + 0.2 * math.sin(self.border_timer))))
         pygame.draw.rect(screen, border_color, self.rect, 3)
 
-        # Header Zone (y=182-282)
         if self.combat_mode:
-            # Room name
-            text = font_large.render(self.text[0], True, WHITE)
-            text_rect = text.get_rect(center=(self.rect.x + 400, self.rect.y + 50))
-            screen.blit(text, text_rect)
-            # Enemy info (left)
-            text = font.render(f"{self.entity.name}: {self.entity.hp}/{self.entity.max_hp}", True, CYAN)
-            screen.blit(text, (self.rect.x + 20, self.rect.y + 80))
-            hp_ratio = self.hp_animation["entity"]["current"] / self.entity.max_hp
-            if self.hp_animation["entity"]["time"] > 0:
-                t = self.hp_animation["entity"]["time"] / 0.5
-                hp_ratio = self.hp_animation["entity"]["current"] + t * (self.hp_animation["entity"]["target"] - self.hp_animation["entity"]["current"])
-                self.hp_animation["entity"]["time"] -= 1/60
-            pygame.draw.rect(screen, RED, (self.rect.x + 20, self.rect.y + 110, 200, 20))
-            pygame.draw.rect(screen, GREEN, (self.rect.x + 20, self.rect.y + 110, 200 * hp_ratio, 20))
-            # Player info (right)
-            text = font.render(f"Droid-E002: {self.player.hp}/50", True, CYAN)
-            screen.blit(text, (self.rect.x + 580, self.rect.y + 80))
-            hp_ratio = self.hp_animation["player"]["current"] / 50
-            if self.hp_animation["player"]["time"] > 0:
-                t = self.hp_animation["player"]["time"] / 0.5
-                hp_ratio = self.hp_animation["player"]["current"] + t * (self.hp_animation["player"]["target"] - self.hp_animation["player"]["current"])
-                self.hp_animation["player"]["time"] -= 1/60
-            pygame.draw.rect(screen, RED, (self.rect.x + 580, self.rect.y + 110, 200, 20))
-            pygame.draw.rect(screen, GREEN, (self.rect.x + 580, self.rect.y + 110, 200 * hp_ratio, 20))
+            if not (self.player and self.entity and self.room):
+                text = font.render("Error: Combat data missing!", True, RED)
+                screen.blit(text, (self.rect.x + 20, self.rect.y + 20))
+                return
+
+            try:
+                # Room name
+                text = font_large.render(self.text[0], True, WHITE)
+                screen.blit(text, (self.rect.x + 400 - text.get_width() // 2, self.rect.y + 20))
+
+                # Health bars background for clarity
+                hp_background = pygame.Rect(self.rect.x + 100, self.rect.y + 80, 600, 80)
+                pygame.draw.rect(screen, (0, 0, 0, 100), hp_background)
+
+                # Enemy health bar and text (left side)
+                text = font.render(f"{self.entity.name}: {self.entity.hp}/{self.entity.max_hp}", True, CYAN)
+                screen.blit(text, (self.rect.x + 100, self.rect.y + 80))
+                hp_ratio = self.hp_animation["entity"]["current"] / self.entity.max_hp if self.entity.max_hp > 0 else 0
+                if self.hp_animation["entity"]["time"] > 0:
+                    t = self.hp_animation["entity"]["time"] / 0.5
+                    hp_ratio = self.hp_animation["entity"]["current"] + t * (self.hp_animation["entity"]["target"] - self.hp_animation["entity"]["current"])
+                    self.hp_animation["entity"]["time"] -= delta_time
+                    if self.hp_animation["entity"]["time"] < 0:
+                        self.hp_animation["entity"]["time"] = 0
+                pygame.draw.rect(screen, RED, (self.rect.x + 100, self.rect.y + 110, 150, 20))
+                pygame.draw.rect(screen, GREEN, (self.rect.x + 100, self.rect.y + 110, 150 * max(0, min(1, hp_ratio)), 20))
+
+                # Player health bar and text (right side)
+                text = font.render(f"Droid-E002: {self.player.hp}/50", True, CYAN)
+                screen.blit(text, (self.rect.x + 800 - 150 - 10, self.rect.y + 80))
+                hp_ratio = self.hp_animation["player"]["current"] / 50 if self.player.hp > 0 else 0
+                if self.hp_animation["player"]["time"] > 0:
+                    t = self.hp_animation["player"]["time"] / 0.5
+                    hp_ratio = self.hp_animation["player"]["current"] + t * (self.hp_animation["player"]["target"] - self.hp_animation["player"]["current"])
+                    self.hp_animation["player"]["time"] -= delta_time
+                    if self.hp_animation["player"]["time"] < 0:
+                        self.hp_animation["player"]["time"] = 0
+                pygame.draw.rect(screen, RED, (self.rect.x + 800 - 150 - 10, self.rect.y + 110, 150, 20))
+                pygame.draw.rect(screen, GREEN, (self.rect.x + 800 - 150 - 10, self.rect.y + 110, 150 * max(0, min(1, hp_ratio)), 20))
+
+                # Entity sprite (centered)
+                self.sprite_timer += 0.1
+                scale = 1.0 + 0.02 * math.sin(self.sprite_timer)
+                scaled_sprite = pygame.transform.scale(self.entity_sprite, (int(128 * scale), int(128 * scale)))
+                screen.blit(scaled_sprite, (self.rect.x + 400 - 64, self.rect.y + 250 - 64))
+
+                # Combat log (left side, moved down)
+                pygame.draw.rect(screen, (0, 0, 0, 100), (self.rect.x + 20, self.rect.y + 320, 300, 150))
+                pygame.draw.rect(screen, CYAN, (self.rect.x + 20, self.rect.y + 320, 300, 150), 1)
+                visible_lines = list(self.combat_log_lines)[-5 - self.log_offset:-self.log_offset if self.log_offset > 0 else None]
+                for i, line in enumerate(visible_lines):
+                    color = RED if "deals" in line.lower() or "destroyed" in line.lower() else \
+                            GREEN if "restored" in line.lower() else \
+                            YELLOW if "overheated" in line.lower() or "cools down" in line.lower() or "dodged" in line.lower() else CYAN
+                    text = font_small.render(line, True, color)
+                    screen.blit(text, (self.rect.x + 25, self.rect.y + 325 + i * 30))
+
+                # Action buttons (horizontal row at bottom)
+                button_width = 120
+                button_height = 40
+                spacing = 30
+                total_width = 4 * button_width + 3 * spacing
+                start_x = self.rect.x + 400 - total_width // 2
+                self.phase_shift_button = pygame.Rect(start_x, self.rect.y + 460, button_width, button_height)
+                self.nano_repair_button = pygame.Rect(start_x + button_width + spacing, self.rect.y + 460, button_width, button_height)
+                self.quantum_disruptor_button = pygame.Rect(start_x + 2 * (button_width + spacing), self.rect.y + 460, button_width, button_height)
+                self.quantum_strike_button = pygame.Rect(start_x + 3 * (button_width + spacing), self.rect.y + 460, button_width, button_height)
+
+                for button, text_str in [(self.phase_shift_button, "Phase Shift"),
+                                        (self.nano_repair_button, "Nano Repair"),
+                                        (self.quantum_disruptor_button, "Disruptor"),
+                                        (self.quantum_strike_button, "Quantum Strike")]:
+                    mouse_pos = pygame.mouse.get_pos()
+                    enabled = True
+                    if button == self.nano_repair_button:
+                        nano_qty = sum(qty for item, qty in self.player.inventory if item.name == "Nano Repair Kit")
+                        enabled = nano_qty > 0 and not self.player.overheated
+                    elif button == self.quantum_disruptor_button:
+                        disruptor_qty = sum(qty for item, qty in self.player.inventory if item.name == "Quantum Disruptor")
+                        enabled = disruptor_qty > 0
+                    elif button == self.phase_shift_button:
+                        enabled = self.player.quanta >= 3
+                    color = CYAN if enabled and button.collidepoint(mouse_pos) else SILVER if enabled else GRAY
+                    pygame.draw.rect(screen, color, button)
+                    text = font_small.render(text_str, True, BLACK)
+                    text_x = button.x + (button_width - text.get_width()) // 2
+                    text_y = button.y + (button_height - text.get_height()) // 2
+                    screen.blit(text, (text_x, text_y))
+                    if not enabled:
+                        pygame.draw.line(screen, RED, button.topleft, button.bottomright, 3)
+                        pygame.draw.line(screen, RED, button.topright, button.bottomleft, 3)
+                    if button == self.nano_repair_button and enabled:
+                        text = font_small.render(f"x{nano_qty}", True, CYAN)
+                        screen.blit(text, (button.x + button_width - text.get_width() - 5, button.y + button_height + 5))
+                    elif button == self.quantum_disruptor_button and enabled:
+                        disruptor_qty = sum(qty for item, qty in self.player.inventory if item.name == "Quantum Disruptor")
+                        text = font_small.render(f"x{disruptor_qty}", True, CYAN)
+                        screen.blit(text, (button.x + button_width - text.get_width() - 5, button.y + button_height + 5))
+            except Exception as e:
+                print(f"Error rendering combat UI: {e}")
+                text = font.render("Combat UI Error!", True, RED)
+                screen.blit(text, (self.rect.x + 20, self.rect.y + 20))
         else:
-            # Non-combat text
+            # Non-combat mode
             for i, line in enumerate(self.text):
                 text = font.render(line, True, WHITE)
                 screen.blit(text, (self.rect.x + 20, self.rect.y + 20 + i * 30))
-
-        # Visual Zone (y=282-482)
-        if self.combat_mode:
-            self.sprite_timer += 0.1
-            scale = 1.0 + 0.02 * math.sin(self.sprite_timer)
-            scaled_sprite = pygame.transform.scale(self.entity_sprite, (int(128 * scale), int(128 * scale)))
-            screen.blit(scaled_sprite, (self.rect.x + 336, self.rect.y + 230))
-
-        # Log Zone (y=382-482)
-        if self.combat_mode:
-            pygame.draw.rect(screen, (0, 0, 0, 100), (self.rect.x + 20, self.rect.y + 340, 300, 100))  # Darker background
-            pygame.draw.rect(screen, CYAN, (self.rect.x + 20, self.rect.y + 340, 300, 100), 1)
-            visible_lines = list(self.combat_log_lines)[-5 - self.log_offset:-self.log_offset if self.log_offset > 0 else None]
-            for i, line in enumerate(visible_lines):
-                color = RED if "deals" in line.lower() or "destroyed" in line.lower() else \
-                        GREEN if "restored" in line.lower() else \
-                        YELLOW if "overheated" in line.lower() or "cools down" in line.lower() or "dodged" in line.lower() else CYAN
-                text = font_small.render(line, True, color)
-                screen.blit(text, (self.rect.x + 25, self.rect.y + 345 + i * 20))
-
-        # Action Zone (y=442-482)
-        if self.combat_mode:
-            mouse_pos = pygame.mouse.get_pos()
-            # Quantum Strike
-            color = CYAN if self.quantum_strike_button.collidepoint(mouse_pos) else SILVER
-            pygame.draw.rect(screen, color, self.quantum_strike_button)
-            text = font.render("Quantum Strike", True, BLACK)
-            screen.blit(text, (self.quantum_strike_button.x + 5, self.quantum_strike_button.y + 12))
-            # Nano Repair Kit
-            nano_qty = 0
-            for item, qty in self.player.inventory:
-                if item.name == "Nano Repair Kit":
-                    nano_qty = qty
-                    break
-            enabled = nano_qty > 0 and not self.player.overheated
-            color = CYAN if enabled and self.nano_repair_button.collidepoint(mouse_pos) else SILVER if enabled else GRAY
-            pygame.draw.rect(screen, color, self.nano_repair_button)
-            text = font.render("Nano Repair", True, BLACK)
-            screen.blit(text, (self.nano_repair_button.x + 5, self.nano_repair_button.y + 12))
-            text = font_small.render(f"x{nano_qty}", True, CYAN)
-            screen.blit(text, (self.nano_repair_button.x + 60, self.nano_repair_button.y + 2))
-            if not enabled:
-                pygame.draw.line(screen, RED, self.nano_repair_button.topleft, self.nano_repair_button.bottomright, 3)
-                pygame.draw.line(screen, RED, self.nano_repair_button.topright, self.nano_repair_button.bottomleft, 3)
-            # Quantum Disruptor
-            disruptor_qty = 0
-            for item, qty in self.player.inventory:
-                if item.name == "Quantum Disruptor":
-                    disruptor_qty = qty
-                    break
-            enabled = disruptor_qty > 0
-            color = CYAN if enabled and self.quantum_disruptor_button.collidepoint(mouse_pos) else SILVER if enabled else GRAY
-            pygame.draw.rect(screen, color, self.quantum_disruptor_button)
-            text = font.render("Disruptor", True, BLACK)
-            screen.blit(text, (self.quantum_disruptor_button.x + 5, self.quantum_disruptor_button.y + 12))
-            text = font_small.render(f"x{disruptor_qty}", True, CYAN)
-            screen.blit(text, (self.quantum_disruptor_button.x + 60, self.quantum_disruptor_button.y + 2))
-            if not enabled:
-                pygame.draw.line(screen, RED, self.quantum_disruptor_button.topleft, self.quantum_disruptor_button.bottomright, 3)
-                pygame.draw.line(screen, RED, self.quantum_disruptor_button.topright, self.quantum_disruptor_button.bottomleft, 3)
-            # Phase Shift (Dodge)
-            enabled = self.player.quanta >= 3
-            color = CYAN if enabled and self.phase_shift_button.collidepoint(mouse_pos) else SILVER if enabled else GRAY
-            pygame.draw.rect(screen, color, self.phase_shift_button)
-            text = font.render("Phase Shift", True, BLACK)
-            screen.blit(text, (self.phase_shift_button.x + 5, self.phase_shift_button.y + 12))
-            if not enabled:
-                pygame.draw.line(screen, RED, self.phase_shift_button.topleft, self.phase_shift_button.bottomright, 3)
-                pygame.draw.line(screen, RED, self.phase_shift_button.topright, self.phase_shift_button.bottomleft, 3)
-
-        # Non-combat close button
-        if not self.combat_mode:
             pygame.draw.rect(screen, WHITE, self.close_button)
             text = font.render("Close", True, BLACK)
             screen.blit(text, (self.close_button.x + 5, self.close_button.y + 5))
 
         # Tooltip
         if self.tooltip:
+            mouse_pos = pygame.mouse.get_pos()
             text = font_small.render(self.tooltip, True, WHITE)
             tooltip_rect = pygame.Rect(mouse_pos[0] + 10, mouse_pos[1] + 10, 200, 30)
             pygame.draw.rect(screen, BLACK, tooltip_rect)
@@ -755,29 +769,25 @@ class Popup:
     def handle_click(self, pos, player, room):
         if not self.active:
             return False
-        if not self.rect.collidepoint(pos):  # Ignore clicks outside popup
+        if not self.rect.collidepoint(pos):
             return False
         if self.combat_mode:
             self.tooltip = None
             mouse_pos = pos
             # Quantum Strike
-            if self.quantum_strike_button.collidepoint(pos):
+            if self.quantum_strike_button and self.quantum_strike_button.collidepoint(pos):
                 self.combat_action = "quantum_strike"
                 self.hp_animation["entity"]["current"] = self.entity.hp
-                self.hp_animation["entity"]["target"] = max(0, self.entity.hp - random.randint(5, 10))  # Approximate for animation
+                self.hp_animation["entity"]["target"] = max(0, self.entity.hp - random.randint(5, 10))
                 self.hp_animation["entity"]["time"] = 0.5
                 self.hp_animation["player"]["current"] = self.player.hp
                 self.hp_animation["player"]["target"] = max(0, self.player.hp - (self.entity.attack // 2 if self.entity.weakened else self.entity.attack))
-                self.hp_animation["player"]["time"] = 0.5               
+                self.hp_animation["player"]["time"] = 0.5
                 player.combat(room.entity, self)
                 return True
             # Nano Repair Kit
-            elif self.nano_repair_button.collidepoint(pos):
-                nano_qty = 0
-                for item, qty in player.inventory:
-                    if item.name == "Nano Repair Kit":
-                        nano_qty = qty
-                        break
+            elif self.nano_repair_button and self.nano_repair_button.collidepoint(pos):
+                nano_qty = sum(qty for item, qty in player.inventory if item.name == "Nano Repair Kit")
                 if nano_qty > 0 and not player.overheated:
                     self.combat_action = "nano_repair_kit"
                     self.hp_animation["player"]["current"] = self.player.hp
@@ -789,12 +799,8 @@ class Popup:
                     player.combat(room.entity, self)
                     return True
             # Quantum Disruptor
-            elif self.quantum_disruptor_button.collidepoint(pos):
-                disruptor_qty = 0
-                for item, qty in player.inventory:
-                    if item.name == "Quantum Disruptor":
-                        disruptor_qty = qty
-                        break
+            elif self.quantum_disruptor_button and self.quantum_disruptor_button.collidepoint(pos):
+                disruptor_qty = sum(qty for item, qty in player.inventory if item.name == "Quantum Disruptor")
                 if disruptor_qty > 0:
                     self.combat_action = "quantum_disruptor"
                     self.hp_animation["entity"]["current"] = self.entity.hp
@@ -806,7 +812,7 @@ class Popup:
                     player.combat(room.entity, self)
                     return True
             # Phase Shift (Dodge)
-            elif self.phase_shift_button.collidepoint(pos):
+            elif self.phase_shift_button and self.phase_shift_button.collidepoint(pos):
                 if player.quanta >= 3:
                     self.combat_action = "phase_shift"
                     self.hp_animation["player"]["current"] = self.player.hp
@@ -829,9 +835,9 @@ class Popup:
             self.log_offset = max(0, min(self.log_offset - event.y, len(self.combat_log_lines) - 5))
         elif event.type == pygame.MOUSEMOTION and self.combat_mode:
             self.tooltip = None
-            if self.nano_repair_button.collidepoint(event.pos):
+            if self.nano_repair_button and self.nano_repair_button.collidepoint(event.pos):
                 self.tooltip = ITEMS["nano_repair_kit"].description
-            elif self.quantum_disruptor_button.collidepoint(event.pos):
+            elif self.quantum_disruptor_button and self.quantum_disruptor_button.collidepoint(event.pos):
                 self.tooltip = ITEMS["quantum_disruptor"].description
 
 # Main game
@@ -843,11 +849,11 @@ popup = Popup()
 clock = pygame.time.Clock()
 running = True
 
-# Show starting room popup
+# Removed popup.show() for initial room entry
 dungeon.visited.add((0, 2))
-popup.show(["Room Entry", dungeon.rooms[0].description[0], dungeon.rooms[0].description[1]])
 
 while running:
+    delta_time = clock.get_time() / 1000  # Convert ms to seconds
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -857,8 +863,13 @@ while running:
             if popup.handle_click(event.pos, player, player.current_room):
                 if popup.game_over:
                     running = False
-            left_ui.handle_click(event.pos, player, player.current_room)
-            right_ui.handle_click(event.pos, player, popup)
+                continue
+            if left_ui.handle_click(event.pos, player, player.current_room):
+                continue
+            if right_ui.handle_click(event.pos, player, popup):
+                if player.current_room.grid_x == 0 and player.current_room.grid_y == 2 and player.quanta >= 10:
+                    running = False
+                continue
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_RETURN and popup.active and not popup.combat_mode:
                 popup.active = False
@@ -872,7 +883,10 @@ while running:
     offset = (573, 57)
     for room in dungeon.rooms:
         offset_rect = room.rect.move(offset)
-        color = BLUE if room == player.current_room else SILVER
+        if (room.grid_x, room.grid_y) in dungeon.visited:
+            color = GREEN if room == player.current_room else SILVER
+        else:
+            color = GRAY
         pygame.draw.rect(screen, color, offset_rect)
         pygame.draw.rect(screen, CYAN, offset_rect, 4)
         for door_rect in room.get_door_rects():
@@ -883,7 +897,7 @@ while running:
     screen.blit(starship_sprite, starship_pos)
     # Draw right UI and popup
     right_ui.draw(screen, player)
-    popup.draw(screen)
+    popup.draw(screen, delta_time)
     pygame.display.flip()
     clock.tick(60)
 
