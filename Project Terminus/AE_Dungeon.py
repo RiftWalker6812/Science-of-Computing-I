@@ -229,6 +229,8 @@ class Player:
         self.dungeon = dungeon
         self.overheated = False  # Track Nano Repair Kit overheat
         self.dodge_active = False  # Track Phase Shift (Dodge)
+        self.exiting = False  # Track extraction animation
+        self.exit_animation_start = 0  # Animation start time
 
     def move(self, direction, popup):
         new_x, new_y = self.current_room.grid_x, self.current_room.grid_y
@@ -246,6 +248,7 @@ class Player:
 
         new_room = self.dungeon.grid[new_y][new_x]
         if new_room:
+            self.quanta += 1  # Increment quanta for moving to a new room
             self.current_room = new_room
             print(f"Moved to Room at ({new_room.grid_x}, {new_room.grid_y})")
             if (new_room.grid_x, new_room.grid_y) not in self.dungeon.visited:
@@ -257,13 +260,16 @@ class Player:
         return False
 
     def exit_dungeon(self, popup):
-        """Initiate the process of exiting the quantum pagoda."""
-        if self.quanta >= 10:
-            popup.show(["Mission Success", "Quantum Pagoda stabilized. Returning to base."])
-            return True
-        else:
-            popup.show(["Mission Incomplete", "Insufficient Quanta to stabilize the Pagoda."])
-            return False
+        """Initiate the extraction sequence if conditions are met."""
+        if self.current_room.grid_x == 0 and self.current_room.grid_y == 2:
+            if self.quanta >= 10:
+                self.exiting = True
+                self.exit_animation_start = pygame.time.get_ticks() / 1000.0
+                return True
+            else:
+                popup.show(["Mission Incomplete", "Insufficient Quanta to stabilize the Pagoda."])
+                return False
+        return False
 
     def combat(self, entity, popup):
         action = popup.combat_action
@@ -374,7 +380,7 @@ class Player:
                     break
             else:
                 self.inventory.append([ITEMS["quantum_crystal"], 1])
-                self.quanta += 1
+                self.quanta += 3
             popup.combat_mode = False
 
 class LeftUI:
@@ -472,7 +478,7 @@ class RightUI:
 
         text = font.render(f"Droid-E002: HP {player.hp}/50", True, WHITE)
         screen.blit(text, (SCREEN_WIDTH - RIGHT_UI_WIDTH + 20, 20))
-        text = font.render(f"Quanta: {player.quanta}/20", True, WHITE)  # Renamed from Quantium
+        text = font.render(f"Quanta: {player.quanta}/20", True, WHITE)
         screen.blit(text, (SCREEN_WIDTH - RIGHT_UI_WIDTH + 20, 60))
 
         for direction, rect in self.buttons.items():
@@ -527,8 +533,7 @@ class RightUI:
                     print("Room scanned. Objects visible in left UI.")
                     return True
                 elif direction == "exit" and player.current_room.grid_x == 0 and player.current_room.grid_y == 2:
-                    if player.exit_dungeon(popup):
-                        return True  # Allow main loop to handle game end
+                    player.exit_dungeon(popup)
                     return True
                 elif player.move(direction, popup):
                     return True
@@ -576,18 +581,25 @@ class Popup:
         self.rect = pygame.Rect(368, 182, 800, 500)  # 800x500 centered
         self.close_button = pygame.Rect(self.rect.right - 60, self.rect.bottom - 40, 50, 30)
         self.combat_mode = False
+        self.exit_mode = False  # New mode for exit popup
         self.combat_action = None
         self.combat_log_lines = deque(maxlen=5)  # Max 5 lines, scrollable
         self.log_offset = 0  # For scrolling
         self.game_over = False
+        self.exit_game = False  # Flag to exit game
+        self.reset_game = False  # Flag to reset game
         self.player = None
         self.entity = None
         self.room = None
-        # Action buttons (will be set in draw)
+        # Action buttons (combat)
         self.quantum_strike_button = None
         self.nano_repair_button = None
         self.quantum_disruptor_button = None
         self.phase_shift_button = None
+        # Exit buttons
+        self.exit_game_button = None
+        self.new_dungeon_button = None
+        self.construct_button = None
         # Entity sprite (placeholder)
         self.entity_sprite = pygame.Surface((128, 128), pygame.SRCALPHA)
         for x in range(128):
@@ -610,12 +622,22 @@ class Popup:
         self.active = True
         self.text = text if isinstance(text, list) else [text]
         self.combat_mode = False
+        self.exit_mode = False
+        self.combat_log_lines.clear()
+        self.log_offset = 0
+
+    def show_exit(self):
+        self.active = True
+        self.text = ["You have left the dungeon"]
+        self.combat_mode = False
+        self.exit_mode = True
         self.combat_log_lines.clear()
         self.log_offset = 0
 
     def start_combat(self, player, room):
         self.active = True
         self.combat_mode = True
+        self.exit_mode = False
         self.combat_action = None
         self.combat_log_lines.clear()
         self.log_offset = 0
@@ -748,8 +770,41 @@ class Popup:
                 print(f"Error rendering combat UI: {e}")
                 text = font.render("Combat UI Error!", True, RED)
                 screen.blit(text, (self.rect.x + 20, self.rect.y + 20))
+        elif self.exit_mode:
+            # Exit popup
+            text = font_large.render(self.text[0], True, WHITE)
+            screen.blit(text, (self.rect.x + 400 - text.get_width() // 2, self.rect.y + 100))
+
+            # Add the label in the center
+            label = "Thanks for trying out AE: Assembly Alpha v0.7"
+            sub_label = "Prequel of AE: TERMINUS"
+            label_text = font.render(label, True, CYAN)
+            sub_label_text = font.render(sub_label, True, CYAN)
+            screen.blit(label_text, (self.rect.x + 400 - label_text.get_width() // 2, self.rect.y + 200))
+            screen.blit(sub_label_text, (self.rect.x + 400 - sub_label_text.get_width() // 2, self.rect.y + 240))
+
+            # Exit buttons (horizontal row at bottom)
+            button_width = 150
+            button_height = 40
+            spacing = 30
+            total_width = 3 * button_width + 2 * spacing
+            start_x = self.rect.x + 400 - total_width // 2
+            self.exit_game_button = pygame.Rect(start_x, self.rect.y + 460, button_width, button_height)
+            self.new_dungeon_button = pygame.Rect(start_x + button_width + spacing, self.rect.y + 460, button_width, button_height)
+            self.construct_button = pygame.Rect(start_x + 2 * (button_width + spacing), self.rect.y + 460, button_width, button_height)
+
+            for button, text_str in [(self.exit_game_button, "Exit Game"),
+                                    (self.new_dungeon_button, "Enter New Dungeon"),
+                                    (self.construct_button, "Construct Assembly")]:
+                mouse_pos = pygame.mouse.get_pos()
+                color = CYAN if button.collidepoint(mouse_pos) else SILVER
+                pygame.draw.rect(screen, color, button)
+                text = font_small.render(text_str, True, BLACK)
+                text_x = button.x + (button_width - text.get_width()) // 2
+                text_y = button.y + (button_height - text.get_height()) // 2
+                screen.blit(text, (text_x, text_y))
         else:
-            # Non-combat mode
+            # Non-combat, non-exit popup
             for i, line in enumerate(self.text):
                 text = font.render(line, True, WHITE)
                 screen.blit(text, (self.rect.x + 20, self.rect.y + 20 + i * 30))
@@ -823,6 +878,18 @@ class Popup:
                     self.hp_animation["entity"]["time"] = 0.5
                     player.combat(room.entity, self)
                     return True
+        elif self.exit_mode:
+            if self.exit_game_button and self.exit_game_button.collidepoint(pos):
+                self.exit_game = True
+                self.active = False
+                return True
+            elif self.new_dungeon_button and self.new_dungeon_button.collidepoint(pos):
+                self.reset_game = True
+                self.active = False
+                return True
+            elif self.construct_button and self.construct_button.collidepoint(pos):
+                print("Construct Project Assembly: Feature not implemented")
+                return True
         elif self.close_button.collidepoint(pos):
             self.active = False
             if self.game_over:
@@ -852,6 +919,10 @@ running = True
 # Removed popup.show() for initial room entry
 dungeon.visited.add((0, 2))
 
+# Starship position (dynamic for animation)
+starship_pos = [573 - STARSHIP_SPRITE_SIZE, 357 + ROOM_SIZE//2 - STARSHIP_SPRITE_SIZE//2]  # [445, 368]
+EXIT_ANIMATION_DURATION = 2.0  # 2 seconds
+
 while running:
     delta_time = clock.get_time() / 1000  # Convert ms to seconds
     for event in pygame.event.get():
@@ -861,20 +932,39 @@ while running:
             if popup.active and not popup.rect.collidepoint(event.pos):
                 continue  # Ignore clicks outside popup
             if popup.handle_click(event.pos, player, player.current_room):
-                if popup.game_over:
+                if popup.game_over or popup.exit_game:
                     running = False
+                elif popup.reset_game:
+                    # Reset game state
+                    dungeon = Dungeon()
+                    player = Player(dungeon)
+                    left_ui = LeftUI()
+                    right_ui = RightUI()
+                    popup = Popup()
+                    dungeon.visited.add((0, 2))
+                    starship_pos = [573 - STARSHIP_SPRITE_SIZE, 357 + ROOM_SIZE//2 - STARSHIP_SPRITE_SIZE//2]
+                    popup.reset_game = False
                 continue
             if left_ui.handle_click(event.pos, player, player.current_room):
                 continue
             if right_ui.handle_click(event.pos, player, popup):
-                if player.current_room.grid_x == 0 and player.current_room.grid_y == 2 and player.quanta >= 10:
-                    running = False
                 continue
         elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_RETURN and popup.active and not popup.combat_mode:
+            if event.key == pygame.K_RETURN and popup.active and not popup.combat_mode and not popup.exit_mode:
                 popup.active = False
         elif event.type in (pygame.MOUSEWHEEL, pygame.MOUSEMOTION):
             popup.handle_event(event)
+
+    # Handle starship exit animation
+    if player.exiting:
+        current_time = pygame.time.get_ticks() / 1000.0
+        elapsed = current_time - player.exit_animation_start
+        progress = min(elapsed / EXIT_ANIMATION_DURATION, 1.0)
+        # Move starship left from x=445 to x=-128
+        starship_pos[0] = 445 - progress * (445 + 128)
+        if progress >= 1.0:
+            player.exiting = False
+            popup.show_exit()
 
     screen.fill(STARRY_BLUE)
     # Draw left UI
@@ -893,8 +983,7 @@ while running:
             offset_door = door_rect.move(offset)
             pygame.draw.rect(screen, WHITE, offset_door)
     # Draw starship
-    starship_pos = (573 - STARSHIP_SPRITE_SIZE, 357 + ROOM_SIZE//2 - STARSHIP_SPRITE_SIZE//2)
-    screen.blit(starship_sprite, starship_pos)
+    screen.blit(starship_sprite, (int(starship_pos[0]), int(starship_pos[1])))
     # Draw right UI and popup
     right_ui.draw(screen, player)
     popup.draw(screen, delta_time)
