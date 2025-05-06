@@ -116,7 +116,7 @@ class EinsteinEntity:
 
 # Global EE Dictionary
 EE_ENTITIES = {
-    "placeholder": EinsteinEntity("PlaceHolder", 20, 5, "spatial_warp"),
+    "Warper": EinsteinEntity("PlaceHolder", 20, 5, "spatial_warp"),
     "quantum_wraith": EinsteinEntity("Quantum Wraith", 30, 8, "quantum_leech")
 }
 
@@ -177,6 +177,9 @@ class Dungeon:
         self.rooms.append(start_room)
         available = [(start_x, start_y)]
 
+        enemy_rooms = 0  # Track the number of rooms with enemies
+        max_enemies = 5  # Set a maximum number of enemies
+
         while len(self.rooms) < ROOM_COUNT and available:
             curr_x, curr_y = random.choice(available)
             curr_room = self.grid[curr_y][curr_x]
@@ -216,8 +219,10 @@ class Dungeon:
             self.rooms.append(new_room)
             available.append((new_x, new_y))
 
-            if (new_x, new_y) != (0, 2) and random.random() < 0.1:
+            # Spawn enemies with higher probability and ensure a minimum number
+            if (new_x, new_y) != (0, 2) and (random.random() < 0.3 or enemy_rooms < max_enemies):
                 new_room.entity = random.choice(list(EE_ENTITIES.values()))
+                enemy_rooms += 1
 
 class Player:
     def __init__(self, dungeon):
@@ -274,7 +279,7 @@ class Player:
     def combat(self, entity, popup):
         action = popup.combat_action
         popup.combat_log_lines.append(f"--- New Turn ---")
-        
+
         # Reset dodge and overheat at turn start
         self.dodge_active = False
         if self.overheated:
@@ -341,28 +346,6 @@ class Player:
             self.hp -= attack
             popup.combat_log_lines.append(f"{entity.name} deals {attack} damage!")
             entity.weakened = False  # Reset debuff
-            if random.random() < 0.1:
-                if entity.ability == "spatial_warp":
-                    valid_rooms = [(r.grid_x, r.grid_y) for r in self.dungeon.rooms if (r.grid_x, r.grid_y) != (0, 2)]
-                    new_x, new_y = random.choice(valid_rooms)
-                    self.current_room = self.dungeon.grid[new_y][new_x]
-                    popup.combat_log_lines.append("PlaceHolder warps you to another room!")
-                    popup.combat_mode = False
-                elif entity.ability == "quantum_leech":
-                    for i, [item, qty] in enumerate(self.inventory[:]):  # Copy list
-                        if item.name == "Quantum Crystal" and qty > 0:
-                            qty -= 1
-                            self.quanta -= 1
-                            if qty == 0:
-                                to_remove.append(i)
-                            else:
-                                self.inventory[i][1] = qty
-                            popup.combat_log_lines.append("Quantum Wraith steals 1 Quantum Crystal!")
-                            break
-
-        # Remove items after iteration
-        for i in sorted(to_remove, reverse=True):
-            self.inventory.pop(i)
 
         # Resolve combat
         if self.hp <= 0:
@@ -380,8 +363,8 @@ class Player:
                     break
             else:
                 self.inventory.append([ITEMS["quantum_crystal"], 1])
-                self.quanta += 3
-            popup.combat_mode = False
+                self.quanta += 1
+            popup.combat_mode = False  # End combat only when the enemy is defeated
 
 class LeftUI:
     def __init__(self):
@@ -626,13 +609,18 @@ class Popup:
         self.combat_log_lines.clear()
         self.log_offset = 0
 
-    def show_exit(self):
+    def show_exit(self, player):
         self.active = True
         self.text = ["You have left the dungeon"]
         self.combat_mode = False
         self.exit_mode = True
         self.combat_log_lines.clear()
         self.log_offset = 0
+
+        # Check if the player has at least one Quantum Crystal
+        has_crystals = any(item.name == "Quantum Crystal" and qty > 0 for item, qty in player.inventory)
+        if has_crystals:
+            self.text.append("You have the materials needed to begin assembly.")
 
     def start_combat(self, player, room):
         self.active = True
@@ -964,7 +952,7 @@ while running:
         starship_pos[0] = 445 - progress * (445 + 128)
         if progress >= 1.0:
             player.exiting = False
-            popup.show_exit()
+            popup.show_exit(player)  # Pass the player object
 
     screen.fill(STARRY_BLUE)
     # Draw left UI
